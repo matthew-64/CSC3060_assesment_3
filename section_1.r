@@ -19,7 +19,6 @@ living_labels <- c("banana", "cherry", "flower", "pear")
 
 
 
-##################  1.1 #########################
 print("##################  1.1 #########################")
 
 #read.csv(config::get())
@@ -32,11 +31,9 @@ data_shuffled$dummy.verticalness <- 0
 data_shuffled$dummy.verticalness[data_shuffled$label %in% living_labels] <- 1
 
 # randomly shuffle rows:
-print(str(data_shuffled))
-
 data_shuffled = data_shuffled[sample(nrow(data_shuffled)),]
-print(str(data_shuffled))
-# see data on histogram
+
+# visualise data on histogram
 # COULD UPDATE WITH A BETTER LEGEND :)
 veticalness_histogram <- ggplot(data_shuffled, aes(x = verticalness, fill = as.factor(dummy.verticalness))) +
   geom_histogram(binwidth = 0.05, alpha = 0.5, position = 'identity') +
@@ -71,13 +68,10 @@ print(verticalness_plot)
   
 
 
-##################  1.2 #########################
 print("##################  1.2 #########################")
 
 
-# change p in 0.01 intervals:
-#df_names <- c("cut-off value", "amount correct")
-#names(p_values_df) <- df_names
+# change cut-off (p) value in 0.01 intervals:
 p_data <- NULL
 correct_data <- NULL
 for (i in 1:100) {
@@ -128,7 +122,6 @@ print(correctness_cutoff_graph)
 
 
 
-##################  1.3 #########################
 print("##################  1.3 #########################")
 
 # create data frame with living and non-living categories
@@ -138,13 +131,13 @@ catorgised_data$catagory[nr_pix_graph_data$label %in% living_labels] <- "living"
 
 
 # nr_pix graph
-nr_pix_graph <- ggplot(catorgised_data, aes(x = nr_pix, fill = as.factor(catagory))) +
+height_graph <- ggplot(catorgised_data, aes(x = height, fill = as.factor(catagory))) +
   geom_density(adjust = 1.5, alpha = 0.5) + 
   ggtitle("Density plot of\nNumber of pixels for Living and Non-living Images") +
   theme(plot.title = element_text(hjust = 0.5)) +
   labs(fill=c("Living status"))
 
-print(nr_pix_graph)
+print(height_graph)
 
 
 # width graph
@@ -158,7 +151,7 @@ print(width_graph)
 
 
 # span graph
-span_graph <- ggplot(catorgised_data, aes(x = span, fill = as.factor(catagory))) +
+span_graph <- ggplot(catorgised_data, aes(x = height, fill = as.factor(catagory))) +
   geom_density(adjust = 1.5, alpha = 0.5) + 
   ggtitle("Density plot of\nSpan for Living and Non-living Images") +
   theme(plot.title = element_text(hjust = 0.5)) +
@@ -174,26 +167,61 @@ data_shuffled$living_status[nr_pix_graph_data$label %in% living_labels] <- 1
 data_shuffled = data_shuffled[sample(nrow(data_shuffled)),]
 
 # build 3-way logistic regression model
-
-# 0 = non-living, 1 = living
-#glm_data <- DATA
-#glm_data$living_status <- 0
-#glm_data$living_status[nr_pix_graph_data$label %in% living_labels] <- 1
-
-# nr_pix linear regression
-glmfit_nr_pix <- glm(living_status ~ nr_pix, 
+glmfit_nr_pix <- glm(living_status ~ height + width + span, 
                      data = data_shuffled, 
                      family = 'binomial')
-print("1.3: Linear regression for nr_pix:")
+print("1.3: Linear regression for nr_pix, width and span:")
 print(summary(glmfit_nr_pix))
 
 
-# preform 5-fold crossvalidation
+# set up 5-fold crossvalidation
 NUM_K_FOLDS <- 5
 
-
 # split into number of folds (in this case it is 5)
-random_sequence <- cut(1:160, breaks = NUM_K_FOLDS)
-print(str(random_sequence))
+data_shuffled$folds <- cut(seq(1:nrow(data_shuffled)), 
+                           breaks=NUM_K_FOLDS,
+                           labels=FALSE)
+
+correctectness_values <- c()
+fold_num <- c()
+# preform 5-fold crossvalidation
+for (i in 1:NUM_K_FOLDS) {
+  # create training and validation data for particular fold
+  train_items_this_fold  = data_shuffled[data_shuffled$folds != i,] 
+  validation_items_this_fold = data_shuffled[data_shuffled$folds == i,]
+
+  # fit linear regression model on this fold
+  this_glmfit <- glm(living_status ~ height + width + span, 
+                     data = train_items_this_fold, 
+                     family = 'binomial')
+
+  # validate current linear regression model
+  validation_items_this_fold$prediction = predict(this_glmfit, validation_items_this_fold, type="response")
+  validation_items_this_fold$predicted_correct = 0
+  validation_items_this_fold$predicted_correct[validation_items_this_fold$prediction > 0.5] = 1
+
+  # calculate correctness
+  correct_items = validation_items_this_fold$predicted_correct == validation_items_this_fold$living_status
+  num_correct = nrow(validation_items_this_fold[correct_items,])
+  proportion_correct = num_correct / nrow(validation_items_this_fold)
+  
+  # recoed correctness with corresponding number of folds
+  correctectness_values <- append(correctectness_values, proportion_correct)
+  fold_num <- append(fold_num, i)
+}
+
+# Understand corrrectness readings from 5-fold test
+print(paste("Average correctness of linear regression model measured from 5-fold test: ", mean(correctectness_values)))
+
+# Visualise correctness in a graph
+correctness_5_fold_df <- data.frame(fold_num, correctectness_values)
+correctness_5_fold_graph <- ggplot(data = correctness_5_fold_df, aes(x = fold_num, y = correctectness_values)) +
+  geom_point() +
+  scale_y_continuous(name="Correctness", limits=c(0, 1)) +
+  scale_x_continuous(name = "Fold number") +
+  ggtitle("Correctness of Linear Regression Model via 5-fold Analysis") +
+  geom_hline(yintercept = mean(correctectness_values),linetype="dotted", color = "red", size=1)
+
+print(correctness_5_fold_graph)
 
 
