@@ -136,7 +136,6 @@ height_graph <- ggplot(catorgised_data, aes(x = height, fill = as.factor(catagor
   ggtitle("Density plot of:\nHeight for Living and Non-living Images") +
   theme(plot.title = element_text(hjust = 0.5)) +
   labs(fill=c("Living status"))
-
 print(height_graph)
 
 
