@@ -276,7 +276,8 @@ for (i in 1:NUM_K_FOLDS) {
 }
 
 # Understand corrrectness readings from 5-fold test
-print(paste("Average correctness of linear regression model measured from 5-fold test:", mean(correctectness_values), 
+final_correctness_value <- mean(correctectness_values)
+print(paste("Average correctness of linear regression model measured from 5-fold test:", final_correctness_value, 
             ",using a cut-off value of:", max_cutoff_value))
 
 # Visualise correctness in a graph
@@ -285,9 +286,53 @@ correctness_5_fold_graph <- ggplot(data = correctness_5_fold_df, aes(x = fold_nu
   geom_point() +
   scale_y_continuous(name="Correctness", limits=c(0, 1)) +
   scale_x_continuous(name = "Fold number") +
-  ggtitle("Correctness of Linear Regression Model via 5-fold Analysis") +
-  geom_hline(yintercept = mean(correctectness_values),linetype="dotted", color = "red", size=1)
+  ggtitle(paste("Correctness of Linear Regression Model via 5-fold Analysis\nWith Cut-off Value of ", max_cutoff_value)) +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  geom_hline(yintercept = final_correctness_value,linetype="dotted", color = "red", size=1)
 
 print(correctness_5_fold_graph)
+
+
+
+
+
+
+
+
+
+
+
+
+print("##################  1.4 #########################")
+
+# Create a vector brom binomial that has probability of 0.5
+binom_probability <- 0.5
+number_correct <- nrow(DATA) * final_correctness_value
+model_range <- 1:nrow(DATA)
+bimom_model <- dbinom(model_range, nrow(DATA), binom_probability)
+plot(model_range, bimom_model, type="l", col="blue", lty=1, lwd=3, 
+     xlab="sucesses", ylab="Density", 
+     main=paste("Binomial Distribution\n n =" ,nrow(DATA), ", p =", binom_probability))
+
+# Mark where the correctness of the model is
+abline(v=(number_correct), col="red", lty=2, lwd=3)
+
+# Work out p value for correctness
+p_value <- pnorm(number_correct, nrow(DATA), binom_probability)
+print(paste("1.4: P value for a correctness of ", final_correctness_value, "is", p_value))
+
+
+
+
+
+
+print("##################  1.5 #########################")
+
+
+
+
+
+
+
 
 
