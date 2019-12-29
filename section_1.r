@@ -125,7 +125,7 @@ print(correctness_cutoff_graph)
 print("##################  1.3 #########################")
 
 # create data frame with living and non-living categories
-catorgised_data <- DATA
+#catorgised_data <- DATA
 catorgised_data$catagory <- "non-living"
 catorgised_data$catagory[catorgised_data$label %in% living_labels] <- "living"
 
@@ -187,6 +187,7 @@ cut_off_values <- c() # to record cut off that gives highest correctness
 correctness_values_for_each_cut_off <- c() # to record correctness for each cut off value
 correctectness_values <- c() # to store correctness for each fold
 
+#data_shuffled$predicted_correct = 0
 for (x in 1:100) {
   cut_off_value <- x/100
   cut_off_values <- append(cut_off_values, cut_off_value)
@@ -211,6 +212,9 @@ for (x in 1:100) {
     correct_items = validation_items_this_fold$predicted_correct == validation_items_this_fold$living_status
     num_correct = nrow(validation_items_this_fold[correct_items,])
     proportion_correct = num_correct / nrow(validation_items_this_fold)
+    
+    # record if individual image was correct for use in part 1.5
+    
     
     # recoed correctness with corresponding number of folds
     correctectness_values <- append(correctectness_values, proportion_correct)
@@ -250,6 +254,7 @@ print(correctness_cut_off_graph)
 # MAYBE TURN THIS INTO A FUNCTION
 #Preform k-fold cross validation with best suited cutoff point as calculated above
 fold_num <- c() # to store fold
+correct <- c() # store of each image is correct for use in part 1.5
 for (i in 1:NUM_K_FOLDS) {
   # create training and validation data for particular fold
   train_items_this_fold  = data_shuffled[data_shuffled$folds != i,] 
@@ -267,6 +272,7 @@ for (i in 1:NUM_K_FOLDS) {
   
   # calculate correctness
   correct_items = validation_items_this_fold$predicted_correct == validation_items_this_fold$living_status
+  correct <- append(correct, correct_items)
   num_correct = nrow(validation_items_this_fold[correct_items,])
   proportion_correct = num_correct / nrow(validation_items_this_fold)
   
@@ -274,9 +280,11 @@ for (i in 1:NUM_K_FOLDS) {
   correctectness_values <- append(correctectness_values, proportion_correct)
   fold_num <- append(fold_num, i)
 }
+data_shuffled$predicted_correct = correct
 
 # Understand corrrectness readings from 5-fold test
 final_correctness_value <- mean(correctectness_values)
+print(correctectness_values)
 print(paste("Average correctness of linear regression model measured from 5-fold test:", final_correctness_value, 
             ",using a cut-off value of:", max_cutoff_value))
 
@@ -327,12 +335,51 @@ print(paste("1.4: P value for a correctness of ", final_correctness_value, "is",
 
 
 print("##################  1.5 #########################")
+write.csv(data_shuffled, "testing.csv")
+get_incorrectness <- function(my_label) {
+  label_subset <- subset(data_shuffled, label == my_label)
+  #label_subset_incorrect <- label_subset[label_subset$predicted_correct == FALSE,]
+  part_incorrect <- nrow(label_subset[!label_subset$predicted_correct,]) / nrow(label_subset)
+  return(part_incorrect)
+}
+
+data_shuffled$living_status[catorgised_data$label %in% living_labels] <- 1
+data_shuffled = data_shuffled[sample(nrow(data_shuffled)),]
+
+# get list of labels to loop over
+labels <- levels(as.factor(DATA$label))
+incorrectness <- c()
+length(labels)
+# record incorrectness
+# create data frame in order to plot results
+living <- c()
+for (i in 1:length(labels)) {
+  this_label <- labels[i]
+  this_incorrectness <- get_incorrectness(this_label)
+  incorrectness <- append(incorrectness, this_incorrectness)
+  if (this_label %in% living_labels) {
+    living <- append(living, c("living"))
+  } else {
+    living <- append(living, c("non-living"))
+  }
+  print(paste("Incorrectness rate of:", this_label, "=", this_incorrectness))
+}
+
+# create data frame in order to plot results
+incorrectness_df <- data.frame(label = labels, 
+                               living_status = living, 
+                               incorrectness = incorrectness)
+
+#incorrectness_graph <- ggplot(data = incorrectness_df + aes(x = label, y = incorrectness)) +
+#  geom_bar(stat="identity")
+#print(incorrectness_graph)
 
 
 
+# MAKE A BETTER GRAPH
+plot(incorrectness_df$label, incorrectness_df$incorrectness)
 
-
-
-
-
-
+# Determine if wineglass result is signifiant
+# MAYBE CHANGE FROM HARDCODED VALUE
+num_incorrect_wineglass <- 2
+print(paste("P-value of wineglass result:", pbinom(num_incorrect_wineglass, 20, 0.5))))
