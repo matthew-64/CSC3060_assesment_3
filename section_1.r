@@ -382,4 +382,6 @@ plot(incorrectness_df$label, incorrectness_df$incorrectness)
 # Determine if wineglass result is signifiant
 # MAYBE CHANGE FROM HARDCODED VALUE
 num_incorrect_wineglass <- 2
-print(paste("P-value of wineglass result:", pbinom(num_incorrect_wineglass, 20, 0.5))))
+print(paste("P-value of wineglass result:", pbinom(num_incorrect_wineglass, 20, 0.5)))
+
+      
