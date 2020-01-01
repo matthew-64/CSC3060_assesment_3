@@ -335,6 +335,10 @@ print(paste("1.4: P value for a correctness of ", final_correctness_value, "is",
 
 
 print("##################  1.5 #########################")
+
+# SHOULD THIS BE ON TEST OR TRAINING SET?
+# MAKE PART OF TEST SET
+
 write.csv(data_shuffled, "testing.csv")
 get_incorrectness <- function(my_label) {
   label_subset <- subset(data_shuffled, label == my_label)
