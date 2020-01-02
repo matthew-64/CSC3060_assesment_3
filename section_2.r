@@ -6,6 +6,7 @@ set.seed(3060)
 LIVING_ITEMS <- c("banana", "cherry", "flower", "pear")
 NON_LIVING_ITEMS <- c("envelope", "golfclub", "pencil", "wineglass")
 ALL_ITEMS <- append(LIVING_ITEMS, NON_LIVING_ITEMS)
+ALL_ITEMS_ALPHABETICAL <- sort(ALL_ITEMS)
 NUM_ITEMS_PER_IMAGE <- 500
 
 # find out why print out below is not working
@@ -65,6 +66,7 @@ print("################## 2.1 #########################")
 training_data <- DATA
 training_data$living_status <- "non-living"
 training_data$living_status[training_data$label %in% living_labels] <- "living"
+first_8_features <- 3:10
 
 # make dataframe to store and plot results of below
 k_values_df_21 = data.frame(k=c(), accuracy=c())
@@ -74,7 +76,7 @@ k_values_df_21 = data.frame(k=c(), accuracy=c())
 for (i in 1:30) {
   k <- 2*i - 1
   #this_knn <- knn(training_data[3:10] ,training_data[3:10], training_data$living_status, k)
-  this_knn <- knn(training_data[3:10] ,training_data[3:10], training_data$label, k)
+  this_knn <- knn(training_data[first_8_features] ,training_data[first_8_features], training_data$label, k)
   
   #correct_items <- training_data$living_status == this_knn
   accuracy <- sum(this_knn == training_data$label) / nrow(training_data)
@@ -120,17 +122,17 @@ test_k_accuracy <- c() # to store accurcy for each individual fold
 for (i in 1:30) {
   k <- 2*i - 1
   
-  for (fold in num_folds) {
+  for (fold in 1:num_folds) {
     train_data  = data_shuffled[data_shuffled$folds != fold,]
     test_data = data_shuffled[data_shuffled$folds == fold,]
     
     # record train accuracy per fold
-    train_knn <- knn(train_data[3:10] ,train_data[3:10], train_data$label, k)
+    train_knn <- knn(train_data[first_8_features] ,train_data[first_8_features], train_data$label, k)
     train_accuracy <- sum(train_knn == train_data$label) / nrow(train_data)
     train_k_accuracy <- append(train_k_accuracy, train_accuracy)
     
     # record test accuracy per fold
-    test_knn <- knn(train_data[3:10] ,test_data[3:10], train_data$label, k)
+    test_knn <- knn(train_data[first_8_features] ,test_data[first_8_features], train_data$label, k)
     test_accuracy <- sum(test_knn == test_data$label) / nrow(test_data)
     test_k_accuracy <- append(test_accuracy, test_k_accuracy)
   }
@@ -179,5 +181,91 @@ k_values_graph <- ggplot(k_values_df_21, aes(x = inverse_k, y = accuracy)) +
   xlab("1/k")
 
 print(k_values_graph)
+
+# Since both k = 7 and k = 9 both gave a maximum accuracy of 0.77125,
+# Theoritically k = 8 should produce the maxium accuracy:
+
+# test accuracy for k = 8
+k = 8
+knn_test_prediction <- c() # To store the prediction of each lable made by knn
+for (fold in num_folds) {
+  train_data  = data_shuffled[data_shuffled$folds != fold,]
+  test_data = data_shuffled[data_shuffled$folds == fold,]
+  
+  # record test accuracy per fold
+  test_knn <- knn(train_data[first_8_features] ,test_data[first_8_features], train_data$label, k)
+  test_accuracy <- sum(test_knn == test_data$label) / nrow(test_data)
+  test_k_accuracy <- append(test_accuracy, test_k_accuracy)
+}
+
+accuracy <- mean(test_k_accuracy)
+print(paste("k =", k ,"gives accuracy of", accuracy))
+print(paste("k =", k, "is more accurate than k = 7 | 9 is", accuracy >= max_test_accuracy))
+
+
+print("################## 2.3 #########################")
+
+# use an ideal value of k = 9
+k <- 7
+vag_list <- c()
+# preform knn
+knn_test_prediction <- c() # To store the prediction of each lable made by knn
+for (fold in 1:num_folds) {
+  train_data  = data_shuffled[data_shuffled$folds != fold,]
+  test_data = data_shuffled[data_shuffled$folds == fold,]
+  
+  # record test accuracy per fold
+  test_knn <- knn(train_data[first_8_features] ,test_data[first_8_features], train_data$label, k)
+  knn_test_prediction <- append(knn_test_prediction, test_knn)
+  test_accuracy <- sum(test_knn == test_data$label) / nrow(test_data)
+  vag_list <- append(vag_list, test_accuracy)
+  print(test_accuracy)
+}
+
+# swap number for name of item
+knn_test_prediction_labels <- ALL_ITEMS_ALPHABETICAL[knn_test_prediction]
+
+results <- data.frame(actual = data_shuffled$label, predicted = knn_test_prediction_labels)
+incorrect_results = results[results$actual != results$predicted,]
+
+# plot incorrect results
+incorrect_results_bar_chart <- ggplot(data = incorrect_results, aes(x = actual, fill = predicted)) + 
+  geom_bar() +
+  ggtitle("Labels that were incorrectly catorgised") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+print(incorrect_results_bar_chart)
+
+#MAYBE READ AND SAVE TO A CSV FILE?
+# Display how many of each image 
+print("2.3: Error rate of each image")
+error_rate_df <- data.frame(label = c(), num_errors = c(), error_rate = c())
+for (label in ALL_ITEMS_ALPHABETICAL) {
+  # create temp df specific to label
+  label_temp_df <- incorrect_results[incorrect_results$actual == label,]
+  num_errors <- nrow(label_temp_df)
+  error_rate <- num_errors / nrow(data_shuffled[data_shuffled$label == label,])
+  
+  # Print results for user
+  print(paste(label, "- num errors =", num_errors, "for an error rate of", error_rate))
+  
+  temp_df <- data.frame(label = label, 
+                        num_errors = num_errors, 
+                        error_rate = error_rate)
+  error_rate_df <- rbind(error_rate_df, temp_df)
+}
+
+# Save findings to be used in report
+write.csv(error_rate_df, file = "2.3_error_report.csv", row.names = FALSE)
+
+
+
+
+
+
+
+
+
+
 
 
