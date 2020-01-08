@@ -2,7 +2,7 @@ library(caret)
 library(rpart.plot)
 library(rattle)
 library(ipred)
-
+library(randomForest)
 
 set.seed(3060)
 
@@ -53,39 +53,83 @@ for (i in 2:length(feature_file_names)) {
 colnames(DATA) <- data_col_names
 
 # Create a quique id for each image
-DATA$ID = as.numeric(rownames(DATA))
+DATA$ID = as.numeric(rownames(DATA)) # Maybe I dont need this
 
 
 # 3.1
-bagging_df <- data.frame(bag_size = c(), accuracy = c())
 bag_size <- c(25, 50, 200, 400, 800)
+formula = label ~ nr_pix + height + width + span + rows_with_5 + cols_with_5 +
+  neigh1 + neigh5
+
+# a) Out of bag
+bagging_df <- data.frame(bag_size = c(), accuracy = c())
 for (bag in bag_size) {
   print(bag)
-  this_accuracy <- bagging(formula = label ~ nr_pix + height + width + span + rows_with_5 + cols_with_5 +
-                             neigh1 + neigh5, 
+  #tc <- trainControl(method="boot", number=bag)
+  #train(formula = label ~ nr_pix + height + width + span + rows_with_5 + cols_with_5 +
+  #        neigh1 + neigh5,
+  #      data=DATA, trControl=tc, method="treebag")
+  this_accuracy <- bagging(formula = formula, 
                            data = DATA,
                            nbag = bag,
                            coob = TRUE) # out of bag estimate 
-  #temp_df <- data.frame(bag_size = c(bag), accuracy = c(this_accuracy))
-  #bagging_df <- rbind(bagging_df, temp_df)
+  temp_df <- data.frame(bag_size = c(bag), accuracy = c(1 - this_accuracy$err))
+  bagging_df <- rbind(bagging_df, temp_df)
+  
 }
 print(bagging_df)
+
+
+# b) 5-fold cross validation
 num_folds <- 5
+train <- trainControl(method = "cv", number = num_folds)
+
+model <- train(formula,
+               data = DATA,
+               method = "treebag",
+               trControl = train)
+
+print(model$results$Accuracy)
 
 
-# a - out of bag
 
-out_of_bag_df = data.frame(bag_size = c(), error)
 
-set.seed(3060)
-for (bag in bag_size) {
-  for (i in 1:5) {
-    # Look at doing this with caret
-    blah <- bagging(formula = label ~ nr_pix + height + width + span + rows_with_5 + cols_with_5 +
-                      neigh1 + neigh5, 
-                    data = DATA,
-                    nbag = 100,
-                    coob = TRUE) # out of bag estimate 
-    print(blah)
-  }
+# 3.2
+
+rand_forest <- randomForest(formula = formula, data = DATA)
+num_predictors <- expand.grid(.mtry = c(2, 4, 6, 8))
+
+train <- trainControl(method = "cv",
+                      number = num_folds,
+                      search = "grid")
+
+train(formula,
+               data = DATA, 
+               method = "rf", 
+               ntree = 50, 
+               tuneGrid = num_predictors,
+               trControl = train)
+
+rand_forest_df <- data.frame(optimal_num_predictor = c(), ntree = c(), accuracy = c())
+for (i in c(1:16)) {
+  this_ntree <- i * 25
+  print(this_ntree)
+  model <- train(formula,
+                 data = DATA, 
+                 method = "rf", 
+                 ntree = this_ntree, 
+                 tuneGrid = num_predictors,
+                 trControl = train)
+  
+  model_result <- model$results
+  max_accuracy_result <- model_result[model_result$Accuracy == max(model_result$Accuracy),]
+  temp_df <- data.frame(optimal_num_predictor = c(max_accuracy_result$mtry), 
+                        ntree = c(this_ntree), 
+                        accuracy = c(max_accuracy_result$Accuracy))
+  rand_forest_df <- rbind(rand_forest_df, temp_df)
 }
+
+
+#trained3 <- train(Y ~ . , data = mydata, method = "rf", ntree = 500, tunelength = 10, metric = "ROC", trControl = ctrl, importance = TRUE)
+
+
