@@ -56,7 +56,8 @@ colnames(DATA) <- data_col_names
 DATA$ID = as.numeric(rownames(DATA)) # Maybe I dont need this
 
 
-# 3.1
+print("################## 3.1 #########################")
+
 bag_size <- c(25, 50, 200, 400, 800)
 formula = label ~ nr_pix + height + width + span + rows_with_5 + cols_with_5 +
   neigh1 + neigh5
@@ -94,7 +95,8 @@ print(model$results$Accuracy)
 
 
 
-# 3.2
+print("################## 3.2 #########################")
+
 
 rand_forest <- randomForest(formula = formula, data = DATA)
 num_predictors <- expand.grid(.mtry = c(2, 4, 6, 8))
@@ -129,7 +131,57 @@ for (i in c(1:16)) {
   rand_forest_df <- rbind(rand_forest_df, temp_df)
 }
 
+rand_forest_df_plot <- ggplot(data = rand_forest_df, 
+                              mapping = aes(x = ntree, y = accuracy, color = as.factor(optimal_num_predictor))) +
+  geom_point() +
+  ggtitle("Random Forrest Model") +
+  theme(plot.title = element_text(hjust = 0.5)) + 
+  labs(color='NEW LEGEND TITLE') +
+  xlab("Number of trees") +
+  ylab("Accuracy")
 
-#trained3 <- train(Y ~ . , data = mydata, method = "rf", ntree = 500, tunelength = 10, metric = "ROC", trControl = ctrl, importance = TRUE)
+rand_forest_df_plot
+
+
+
+
+
+
+print("################## 3.3 #########################")
+
+print("3.3: best value of tree and predictor number from part 3.2:")
+
+best_rand_forest_df <- rand_forest_df[rand_forest_df$accuracy == max(rand_forest_df$accuracy),]
+print(best_rand_forest_df)
+
+print("While there are 2 answers that give the best number of trees refer to 3.2 in the report to see
+why only a figure of ntree = 350")
+
+optimal_ntree <- 350
+
+best_rand_forest_df <- rand_forest_df[rand_forest_df$ntree == optimal_ntree,]
+print(best_rand_forest_df)
+
+optimal_num_predictor <- best_rand_forest_df$optimal_num_predictor
+
+# Record accuracy over 20 iterations of 5-fold cross validation
+num_predictors <- expand.grid(.mtry = c(optimal_num_predictor))
+rand_forest_accuracy_df <- data.frame(iteration = c(), accuracy = c())
+for (i in 1:20) {
+  print(i)
+  model <- train(formula,
+                 data = DATA, 
+                 method = "rf", 
+                 ntree = optimal_ntree, 
+                 tuneGrid = expand.grid(.mtry = c(optimal_num_predictor)), # this needs changed
+                 trControl = train)
+  temp_df <- data.frame(iteration = c(i), accuracy = c(max(model$results$Accuracy)))
+  rand_forest_accuracy_df <- rbind(rand_forest_accuracy_df, temp_df)
+}
+
+
+
+
+
 
 
