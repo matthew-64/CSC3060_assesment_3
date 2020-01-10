@@ -9,9 +9,6 @@ ALL_ITEMS <- append(LIVING_ITEMS, NON_LIVING_ITEMS)
 ALL_ITEMS_ALPHABETICAL <- sort(ALL_ITEMS)
 NUM_ITEMS_PER_IMAGE <- 500
 
-# find out why print out below is not working
-#   WHY DOES 3397 WINEGLASS INDEX == 3399 WINEGLASS INDEX?
-
 # get feature file names 
 feature_file_names <- list.files(path = "./doodle_data", 
                                  pattern = "*_features.csv",
@@ -75,7 +72,6 @@ k_values_df_21 = data.frame(k=c(), accuracy=c())
 # for k = 1 to 59 (odd only)
 for (i in 1:30) {
   k <- 2*i - 1
-  #this_knn <- knn(training_data[3:10] ,training_data[3:10], training_data$living_status, k)
   this_knn <- knn(training_data[first_8_features] ,training_data[first_8_features], training_data$label, k)
   
   #correct_items <- training_data$living_status == this_knn
@@ -161,16 +157,17 @@ test_train_graph <- ggplot(k_values_df_22, aes(x = inverse_k, y = accuracy, colo
   geom_point() +
   geom_line() + 
   geom_hline(yintercept=max_test_accuracy, linetype="dashed", color = "black") +
-  coord_trans(x = "log10") + # need to improve graph labelling in x axis
+  coord_trans(x = "log10") +
   ggtitle("Accuracy of KNN Model Using Different Values of k") +
   theme(plot.title = element_text(hjust = 0.5)) + 
-  xlab("1/k")
+  xlab("1/k") +
+  labs(color='Type of Data Tested') 
+  
 
 print(test_train_graph)
 
 # plot the graph used for fig 1.2 but with a 1/k value on the x axis
 # append a 1/k collum to the dataframe from 2.1
-#k_values_df_21 <- cbind(k_values_df_21, inverse_k = k_values_df_22$inverse_k)
 k_values_df_21$inverse_k = (1/k_values_df_21$k)
 k_values_graph <- ggplot(k_values_df_21, aes(x = inverse_k, y = accuracy)) + 
   geom_point() +
@@ -182,32 +179,12 @@ k_values_graph <- ggplot(k_values_df_21, aes(x = inverse_k, y = accuracy)) +
 
 print(k_values_graph)
 
-# Since both k = 7 and k = 9 both gave a maximum accuracy of 0.77125,
-# Theoritically k = 8 should produce the maxium accuracy:
-
-# test accuracy for k = 8
-k = 8
-knn_test_prediction <- c() # To store the prediction of each lable made by knn
-for (fold in num_folds) {
-  train_data  = data_shuffled[data_shuffled$folds != fold,]
-  test_data = data_shuffled[data_shuffled$folds == fold,]
-  
-  # record test accuracy per fold
-  test_knn <- knn(train_data[first_8_features] ,test_data[first_8_features], train_data$label, k)
-  test_accuracy <- sum(test_knn == test_data$label) / nrow(test_data)
-  test_k_accuracy <- append(test_accuracy, test_k_accuracy)
-}
-
-accuracy <- mean(test_k_accuracy)
-print(paste("k =", k ,"gives accuracy of", accuracy))
-print(paste("k =", k, "is more accurate than k = 7 | 9 is", accuracy >= max_test_accuracy))
-
 
 print("################## 2.3 #########################")
 
-# use an ideal value of k = 9
+# use an ideal value of k = 7
 k <- 7
-vag_list <- c()
+#vag_list <- c() # figure out what this is
 # preform knn
 knn_test_prediction <- c() # To store the prediction of each lable made by knn
 for (fold in 1:num_folds) {
@@ -218,13 +195,14 @@ for (fold in 1:num_folds) {
   test_knn <- knn(train_data[first_8_features] ,test_data[first_8_features], train_data$label, k)
   knn_test_prediction <- append(knn_test_prediction, test_knn)
   test_accuracy <- sum(test_knn == test_data$label) / nrow(test_data)
-  vag_list <- append(vag_list, test_accuracy)
+  #vag_list <- append(vag_list, test_accuracy)
   print(test_accuracy)
 }
 
-# swap number for name of item
+# swap number for name of item for use in data frame below
 knn_test_prediction_labels <- ALL_ITEMS_ALPHABETICAL[knn_test_prediction]
 
+# Make data frame out of results generated from cross validation
 results <- data.frame(actual = data_shuffled$label, predicted = knn_test_prediction_labels)
 incorrect_results = results[results$actual != results$predicted,]
 
@@ -236,8 +214,7 @@ incorrect_results_bar_chart <- ggplot(data = incorrect_results, aes(x = actual, 
 
 print(incorrect_results_bar_chart)
 
-#MAYBE READ AND SAVE TO A CSV FILE?
-# Display how many of each image 
+# Display exact values of error rate per label
 print("2.3: Error rate of each image")
 error_rate_df <- data.frame(label = c(), num_errors = c(), error_rate = c())
 for (label in ALL_ITEMS_ALPHABETICAL) {

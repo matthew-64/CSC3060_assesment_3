@@ -3,66 +3,52 @@ library(tidyr)
 
 set.seed(3060)
 
-get_living_loc <- function() {
-  return(c(1:40, 61:80, 101:120))  
-}
-
-get_non_living_loc <- function() {
-  return(c(41:60, 81:100, 121:160))
-}
-
-get_all_loc <- function() {
-  return(1:160)
-}
-
 living_labels <- c("banana", "cherry", "flower", "pear")
-
+image_features <- "40153557_features.csv"
 
 
 print("##################  1.1 #########################")
 
-#read.csv(config::get())
-DATA <- read.csv("40153557_features.csv")
+DATA <- read.csv(image_features)
 
 # classify: nonliving = 0, living = 1
-#DOES THIS DATA NEED SHUFFLED? I DON'T THINK SO
-data_shuffled <- DATA
-data_shuffled$dummy.verticalness <- 0
-data_shuffled$dummy.verticalness[data_shuffled$label %in% living_labels] <- 1
+data <- DATA
+data$dummy.verticalness <- 0
+data$dummy.verticalness[data$label %in% living_labels] <- 1
 
-# randomly shuffle rows:
-data_shuffled = data_shuffled[sample(nrow(data_shuffled)),]
+# create living status feature for creating legend in ggplots
+data$living_status <- "non-living"
+data$living_status[data$label %in% living_labels] <- "living"
+
 
 # visualise data on histogram
-# COULD UPDATE WITH A BETTER LEGEND :)
-veticalness_histogram <- ggplot(data_shuffled, aes(x = verticalness, fill = as.factor(dummy.verticalness))) +
+veticalness_histogram <- ggplot(data, aes(x = verticalness, fill = as.factor(living_status))) +
   geom_histogram(binwidth = 0.05, alpha = 0.5, position = 'identity') +
   ggtitle("Verticalness for Living and Non-living Images") +
-  #scale_fill_continuous(name = "blah, breaks = c(0,1), labels = c("123", "sdf"))
-  labs(fill=c("Is living"))
+  theme(plot.title = element_text(hjust = 0.5)) + 
+  labs(fill=c("Living status"))
 
 print(veticalness_histogram)
 
 # perform linear regression
 glmfit <- glm(dummy.verticalness ~ verticalness, 
-              data = data_shuffled,
+              data = data,
               family = 'binomial')
 print("1.1: Linear regression for verticalness:")
 print(summary(glmfit))
 
 # create fitted line
-values <- seq(min(data_shuffled$verticalness), max(data_shuffled$verticalness), length.out = 1000)
+values <- seq(min(data$verticalness), max(data$verticalness), length.out = 1000)
 fitted.curve <- data.frame(verticalness = values)
 fitted.curve[["dummy.verticalness"]] = predict(glmfit, fitted.curve, type="response")
 
 # plot logistic regression
-verticalness_plot <- ggplot(data_shuffled, aes(x=verticalness, y=dummy.verticalness)) + 
-  geom_point(aes(colour = factor(dummy.verticalness)), 
-             show.legend = T, position="dodge") +
+verticalness_plot <- ggplot(data, aes(x=verticalness, y=dummy.verticalness, colour = (living_status))) + 
+  geom_point() +
   geom_line(data=fitted.curve, colour="orange", size=1) + 
-  ggtitle("Linear regression for Living and Non-living Images Based On Vertical") +
+  ggtitle("Logistic regression for Living and Non-living Images Based On Verticalness") +
   ylab("Probability image is living") +
-  labs(fill=c("Is living")) 
+  labs(colour=c("Living status")) 
 
 print(verticalness_plot)
   
@@ -74,9 +60,9 @@ print("##################  1.2 #########################")
 # change cut-off (p) value in 0.01 intervals:
 p_data <- NULL
 correct_data <- NULL
-for (i in 1:100) {
+for (i in 0:100) {
   p <- (i)/100
-  training_data <- data_shuffled
+  training_data <- data # data_shuffled -> data
   training_data[["predicted_verticalness"]] = predict(glmfit, training_data, type="response")
   training_data[["predicted_correct"]] = 0
   training_data[["predicted_correct"]][training_data[["predicted_verticalness"]] > p] = 1
@@ -150,7 +136,7 @@ print(width_graph)
 
 
 # span graph
-span_graph <- ggplot(catorgised_data, aes(x = height, fill = as.factor(catagory))) +
+span_graph <- ggplot(catorgised_data, aes(x = span, fill = as.factor(catagory))) +
   geom_density(adjust = 1.5, alpha = 0.5) + 
   ggtitle("Density plot of:\nSpan for Living and Non-living Images") +
   theme(plot.title = element_text(hjust = 0.5)) +
@@ -169,7 +155,7 @@ data_shuffled = data_shuffled[sample(nrow(data_shuffled)),]
 glmfit_3_way <- glm(living_status ~ height + width + span, 
                     data = data_shuffled, 
                     family = 'binomial')
-print("1.3: Linear regression for nr_pix, width and span:")
+print("1.3: Logistic regression for nr_pix, width and span:")
 print(summary(glmfit_3_way))
 
 
@@ -213,10 +199,7 @@ for (x in 1:100) {
     num_correct = nrow(validation_items_this_fold[correct_items,])
     proportion_correct = num_correct / nrow(validation_items_this_fold)
     
-    # record if individual image was correct for use in part 1.5
-    
-    
-    # recoed correctness with corresponding number of folds
+    # record correctness with corresponding number of folds
     correctectness_values <- append(correctectness_values, proportion_correct)
     #fold_num <- append(fold_num, i)
   }
@@ -228,17 +211,13 @@ for (x in 1:100) {
 correctness_cutoff_df <- data.frame(cut_off = cut_off_values, correctness = correctness_values_for_each_cut_off)
 
 # find largest correctness and corresponding cut off value
-max_correctness_pos <- 0
-max_correctness <- 0
-for (i in 1:nrow(correctness_cutoff_df)) {
-  if (correctness_cutoff_df[i, "correctness"] > max_correctness) {
-    max_correctness <- correctness_cutoff_df[i, "correctness"]
-    max_correctness_pos <- i
-  }
-}
-max_cutoff_value <- correctness_cutoff_df[max_correctness_pos, "cut_off"]
-print(paste("1.3: max correctness = ", max_correctness, "at a cut-off value of ", max_cutoff_value))
+max_correctness_df <- correctness_cutoff_df[correctness_cutoff_df$correctness == max(correctness_cutoff_df$correctness),]
 
+# multiple cut off values so average of max cutoff was taken
+max_cutoff_value <- mean(max_correctness_df$cut_off)
+max_correctness <- max_correctness_df$correctness[1]
+
+print(paste("1.3: max correctness = ", max_correctness, "at a cut-off value of ", max_cutoff_value))
 
 # Plot graph to visualise results of changing the cutoff value on correctness
 correctness_cut_off_graph <- ggplot(data = correctness_cutoff_df, aes(x = cut_off_values, y = correctness_values_for_each_cut_off)) +
@@ -251,7 +230,6 @@ correctness_cut_off_graph <- ggplot(data = correctness_cutoff_df, aes(x = cut_of
 print(correctness_cut_off_graph)
 
 
-# MAYBE TURN THIS INTO A FUNCTION
 #Preform k-fold cross validation with best suited cutoff point as calculated above
 fold_num <- c() # to store fold
 correct <- c() # store of each image is correct for use in part 1.5
@@ -315,7 +293,7 @@ print("##################  1.4 #########################")
 
 # Create a vector brom binomial that has probability of 0.5
 binom_probability <- 0.5
-number_correct <- nrow(DATA) * final_correctness_value
+number_correct <- nrow(DATA) * max_correctness
 model_range <- 1:nrow(DATA)
 bimom_model <- dbinom(model_range, nrow(DATA), binom_probability)
 plot(model_range, bimom_model, type="l", col="blue", lty=1, lwd=3, 
@@ -339,10 +317,10 @@ print("##################  1.5 #########################")
 # SHOULD THIS BE ON TEST OR TRAINING SET?
 # MAKE PART OF TEST SET
 
-write.csv(data_shuffled, "testing.csv")
+
+
 get_incorrectness <- function(my_label) {
   label_subset <- subset(data_shuffled, label == my_label)
-  #label_subset_incorrect <- label_subset[label_subset$predicted_correct == FALSE,]
   part_incorrect <- nrow(label_subset[!label_subset$predicted_correct,]) / nrow(label_subset)
   return(part_incorrect)
 }
@@ -374,14 +352,17 @@ incorrectness_df <- data.frame(label = labels,
                                living_status = living, 
                                incorrectness = incorrectness)
 
-#incorrectness_graph <- ggplot(data = incorrectness_df + aes(x = label, y = incorrectness)) +
-#  geom_bar(stat="identity")
-#print(incorrectness_graph)
+# add living status to data frame for better visulisation in plot
+incorrectness_df$living_status <- "non-living"
+incorrectness_df$living_status[incorrectness_df$label %in% living_labels] <- "living"
 
-
-
-# MAKE A BETTER GRAPH
-plot(incorrectness_df$label, incorrectness_df$incorrectness)
+incorrectness_plot <- ggplot(incorrectness_df, aes(x = label, y = incorrectness, color = living_status)) + 
+  geom_boxplot() +
+  ylab("Error Rate") +
+  ggtitle("Accuracy of Decision Trees Using Different Bag Sizes") +
+  theme(plot.title = element_text(hjust = 0.5)) 
+  
+print(incorrectness_plot)
 
 # Determine if wineglass result is signifiant
 # MAYBE CHANGE FROM HARDCODED VALUE
